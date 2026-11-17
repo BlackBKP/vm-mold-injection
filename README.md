@@ -109,6 +109,8 @@ Start the API using the command above, then start the web application in another
 dotnet run --project vm-mold-injection-web --no-launch-profile -- --urls http://127.0.0.1:5205
 ```
 
-Open http://127.0.0.1:5205. The dashboard refreshes every 30 seconds. Set `InjectionApi__Url` to override the endpoint through an environment variable. API failures show a connection message and retain previously loaded shots.
+Open http://127.0.0.1:5205. The dashboard refreshes every 5 seconds. Set `InjectionApi__Url` to override the endpoint through an environment variable. API failures show a connection message and retain previously loaded shots.
 
 Build all three projects with `dotnet build vm-mold-injection-loader.slnx`.
+
+The factory view uses WebGL and locally bundled Three.js 0.180.0 (MIT license in `wwwroot/vendor/three/LICENSE.txt`). Drag to orbit, scroll or pinch to zoom, and right-drag to pan. Arrow keys orbit a focused floor view. Select a machine or its floating label to inspect the latest available shot. The labels report the latest shot result and connection state. Machine timestamps retain the API's timezone representation. Demo presses and illustrative cycle motion are labeled in the interface.

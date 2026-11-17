@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Injection Monitor</title>
   <link rel="stylesheet" href="dashboard.css">
-  <script src="dashboard.js" defer></script>
+  <script type="importmap">{"imports":{"three":"./vendor/three/three.module.js"}}</script>
+  <script type="module" src="dashboard.js"></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -21,58 +22,47 @@
       </div>
     </header>
     <p id="status" role="status">Loading shots…</p>
-    <section class="overview" aria-labelledby="latest-title">
-      <div class="section-heading"><h2 id="latest-title">Latest shot</h2><p class="muted" id="shot-label">—</p></div>
-      <dl>
-        <div><dt>Cycle time</dt><dd id="cycle-time">—</dd></div>
-        <div><dt>Injection pressure</dt><dd id="pressure">—</dd></div>
-        <div><dt>Cushion</dt><dd id="cushion">—</dd></div>
-        <div><dt>Result</dt><dd id="result">—</dd></div>
-      </dl>
-    </section>
     <section class="viewer" id="machine-view" aria-labelledby="machine-title">
       <div class="viewer-header">
-        <div><h2 id="machine-title">Shop floor</h2><p class="muted">Simulated cycles · Select a press to view its latest shot</p></div>
+        <div><h2 id="machine-title">Factory floor</h2><p class="muted">Drag to orbit · Scroll or pinch to zoom · Right-drag to pan</p></div>
         <div class="actions">
-          <label for="speed">Speed</label>
+          <button id="reset-view" type="button">Reset view</button>
+          <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+          <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+          <label for="speed">Cycle speed</label>
           <select id="speed"><option value=".5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
           <button id="pause" type="button">Pause animation</button>
         </div>
       </div>
-      <div class="stage">
-        <div class="factory-shell" aria-hidden="true">
-          <div class="factory-wall"></div>
-          <div class="floor"></div>
-        </div>
-        <div id="presses" class="presses" aria-label="Molding presses"></div>
-      </div>
-      <template id="press-template">
-        <button class="press" type="button" aria-pressed="false">
-          <span class="press-render" aria-hidden="true"></span>
-          <span class="press-id"></span>
-          <span class="press-type"></span>
-        </button>
-        <div class="machine">
-          <div class="machine-footprint"></div>
-          <div class="base"><i></i><i></i><i></i><i></i></div>
-          <div class="drive"><i></i></div>
-          <div class="hopper"></div>
-          <div class="barrel"><div class="flow"></div></div>
-          <div class="housing">
-            <span class="model">SE100EV-S</span>
-            <div class="window rear-window"></div>
-            <div class="window cycle-window">
-              <div class="rail"></div>
-              <div class="mold moving"></div>
-              <div class="mold fixed"></div>
-              <div class="part"></div>
-            </div>
+      <div class="floor-layout">
+        <div class="scene-column">
+          <div id="scene" tabindex="0" aria-label="Interactive factory floor. Arrow keys orbit. Plus and minus zoom. Use machine buttons below to select a machine.">
+            <canvas id="factory-canvas" aria-label="3D injection molding factory"></canvas>
+            <div id="machine-labels"></div>
+            <p id="scene-error" role="status" hidden></p>
           </div>
-          <div class="controller"><i></i></div>
-          <div class="signal"></div>
+          <p class="scene-note">Machine labels show the latest shot result. Data refreshes every 5 seconds. Motion is illustrative.</p>
+          <div id="machine-list" class="machine-list" role="group" aria-label="Select a machine"></div>
         </div>
-      </template>
-      <div class="cycle"><ol id="phases"><li>Clamp</li><li>Inject</li><li>Cool</li><li>Eject</li></ol><span class="progress" aria-hidden="true"><span></span></span></div>
+        <aside class="machine-detail" aria-labelledby="detail-title">
+          <div class="detail-heading"><h2 id="detail-title">Select a machine</h2><span id="detail-state" class="state">—</span></div>
+          <p class="muted" id="shot-label">Click a machine or its label to inspect its latest shot.</p>
+          <dl>
+            <div><dt>Cycle time</dt><dd id="cycle-time">—</dd></div>
+            <div><dt>Injection pressure</dt><dd id="pressure">—</dd></div>
+            <div><dt>Cushion</dt><dd id="cushion">—</dd></div>
+            <div><dt>Shot result</dt><dd id="result">—</dd></div>
+          </dl>
+          <dl class="shot-details">
+            <div><dt>Mold</dt><dd id="mold-id">—</dd></div>
+            <div><dt>Shot counter</dt><dd id="shot-counter">—</dd></div>
+            <div><dt>Last shot time (machine)</dt><dd id="shot-time">—</dd></div>
+            <div><dt>Data fetched</dt><dd id="fetched-time">—</dd></div>
+            <div><dt>Source file</dt><dd id="source-file">—</dd></div>
+          </dl>
+          <div class="cycle"><ol id="phases"><li>Clamp</li><li>Inject</li><li>Cool</li><li>Eject</li></ol><span class="progress" aria-hidden="true"><span></span></span></div>
+        </aside>
+      </div>
     </section>
     <section class="history" aria-labelledby="history-title">
       <h2 id="history-title">Recent shots</h2>
@@ -90,6 +80,3 @@
   </main>
 </body>
 </html>
-
-
-

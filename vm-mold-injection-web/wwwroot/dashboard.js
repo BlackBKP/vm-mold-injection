@@ -36,17 +36,123 @@ systemTheme.addEventListener("change", () => {
 const status = document.querySelector("#status");
 const refresh = document.querySelector("#refresh");
 const shotsTable = document.querySelector("#shots");
-const format = (value, unit) => value == null ? "—" : `${value}${unit}`;
+const machineList = document.querySelector("#machine-list");
+const speed = document.querySelector("#speed");
+const pause = document.querySelector("#pause");
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const phases = [...document.querySelectorAll("#phases li")];
+const progress = document.querySelector(".progress span");
+const machines = new Map();
+const stationButtons = new Map();
+let selected;
+let factory;
+let stations = [];
 let hasData = false;
+let feedFailed = false;
+let playing = !reducedMotion.matches;
+let currentPhase = -1;
+
+function format(value, unit = "") {
+  if (value == null) return "—";
+  return typeof value === "number" ? `${value.toLocaleString(undefined, { maximumFractionDigits: 3 })}${unit}` : String(value);
+}
+
+function machineStatus(machine) {
+  if (!machine) return { text: "Demo", kind: "demo" };
+  if (feedFailed) return { text: "Connection lost", kind: "stale" };
+  if (!machine.inWindow) return { text: "No recent shots", kind: "unknown" };
+  const result = machine.shot.result;
+  return {
+    text: result ? `Latest ${result}` : "Result unavailable",
+    kind: result?.toUpperCase() === "OK" ? "ok" : "attention"
+  };
+}
+
+function updateDetails() {
+  const station = stations.find(item => item.key === selected);
+  const machine = machines.get(station?.machineId);
+  const latest = machine?.shot;
+  document.querySelector("#detail-title").textContent = station?.label ?? "Select a machine";
+  const state = document.querySelector("#detail-state");
+  state.textContent = station ? station.status.text : "—";
+  state.dataset.state = station?.status.kind ?? "";
+  document.querySelector("#shot-label").textContent = station
+    ? latest ? "Latest available shot from this machine." : "Demo press · No connected machine data."
+    : "Click a machine or its label to inspect its latest shot.";
+  const fields = {
+    "cycle-time": format(latest?.cycleTimeS, " s"),
+    pressure: format(latest?.injectionPressureBar, " bar"),
+    cushion: format(latest?.cushionMm, " mm"),
+    result: latest?.result ?? "—",
+    "mold-id": latest?.moldId ?? "—",
+    "shot-counter": format(latest?.shotCounter),
+    "shot-time": latest?.shotTime?.replace("T", " ") ?? "—",
+    "fetched-time": machine?.fetchedAt.toLocaleTimeString() ?? "—",
+    "source-file": latest?.sourceFile ?? "—"
+  };
+  for (const [id, value] of Object.entries(fields)) document.getElementById(id).textContent = value;
+}
+
+function selectMachine(key) {
+  selected = key;
+  factory?.select(key);
+  for (const [stationKey, button] of stationButtons) {
+    button.setAttribute("aria-pressed", String(stationKey === key));
+  }
+  updateDetails();
+}
+
+function updateFloor() {
+  stations = [...machines.keys()].sort().map(machineId => ({
+    key: `machine:${machineId}`, machineId, label: machineId,
+    status: machineStatus(machines.get(machineId))
+  }));
+  while (stations.length < 6) {
+    const bay = stations.length + 1;
+    stations.push({ key: `demo:${bay}`, label: `Press ${bay}`, status: machineStatus() });
+  }
+  const keys = new Set(stations.map(station => station.key));
+  if (!keys.has(selected)) selected = undefined;
+  for (const [key, button] of stationButtons) {
+    if (keys.has(key)) continue;
+    button.remove();
+    stationButtons.delete(key);
+  }
+  stations.forEach((station, index) => {
+    if (!stationButtons.has(station.key)) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.addEventListener("click", () => selectMachine(station.key));
+      stationButtons.set(station.key, button);
+    }
+    const button = stationButtons.get(station.key);
+    button.textContent = `${station.label} · ${station.status.text}`;
+    button.setAttribute("aria-pressed", String(station.key === selected));
+    if (machineList.children[index] !== button) machineList.insertBefore(button, machineList.children[index] ?? null);
+  });
+  factory?.update(stations, selected);
+  updateDetails();
+}
 
 async function loadShots() {
   if (refresh.disabled) return;
   refresh.disabled = true;
-
   try {
     const response = await fetch("/data/shots", { cache: "no-store" });
     if (!response.ok) throw new Error("Shot request failed");
     const shots = await response.json();
+    if (!Array.isArray(shots) || shots.some(shot => !shot || typeof shot.machineId !== "string")) {
+      throw new Error("Unexpected shot response");
+    }
+    const fetchedAt = new Date();
+    for (const machine of machines.values()) machine.inWindow = false;
+    // The API returns newest shots first. Keep one latest record per machine.
+    const seen = new Set();
+    for (const shot of shots) {
+      if (seen.has(shot.machineId)) continue;
+      machines.set(shot.machineId, { shot, fetchedAt, inWindow: true });
+      seen.add(shot.machineId);
+    }
     const rows = shots.map(shot => {
       const row = document.createElement("tr");
       const values = [
@@ -57,145 +163,26 @@ async function loadShots() {
       for (const value of values) row.insertCell().textContent = value ?? "—";
       return row;
     });
-    updateFloor(shots);
     shotsTable.replaceChildren(...rows);
-    hasData = shots.length > 0;
+    hasData = machines.size > 0;
+    feedFailed = false;
     status.removeAttribute("data-error");
-    status.textContent = hasData
-      ? `${shots.length} shots loaded · ${new Date().toLocaleTimeString()}`
-      : "The API returned no shots.";
+    status.textContent = shots.length
+      ? `${shots.length} shots · ${seen.size} machines in latest response · Updated ${fetchedAt.toLocaleTimeString()}`
+      : "The API returned no recent shots.";
   } catch {
+    feedFailed = true;
     status.setAttribute("data-error", "");
     status.textContent = hasData
-      ? "Unable to refresh. Showing previously loaded shots."
-      : "Unable to load shots. Check the API connection or try again.";
+      ? "Connection lost. Showing last fetched data. Retrying every 5 seconds."
+      : "Unable to load shots. Showing demo presses. Retrying every 5 seconds.";
   } finally {
+    updateFloor();
     refresh.disabled = false;
   }
 }
 
-refresh.addEventListener("click", loadShots);
-setInterval(loadShots, 30000);
-
-const cycleDuration = 8000;
-const timing = { duration: cycleDuration, iterations: Infinity };
-function animatePress(machine) {
-  const movingMold = machine.querySelector(".moving").animate([
-    { left: "8%", offset: 0, easing: "cubic-bezier(.32, 0, .2, 1)" },
-    { left: "44%", offset: .25 },
-    { left: "44%", offset: .75, easing: "cubic-bezier(.32, 0, .2, 1)" },
-    { left: "8%", offset: .88 },
-    { left: "8%", offset: 1 }
-  ], timing);
-  const material = machine.querySelector(".flow").animate([
-    { transform: "scaleX(0)", offset: 0 },
-    { transform: "scaleX(0)", offset: .25 },
-    { transform: "scaleX(1)", offset: .49 },
-    { transform: "scaleX(0)", offset: .50 },
-    { transform: "scaleX(0)", offset: 1 }
-  ], timing);
-  const part = machine.querySelector(".part").animate([
-    { opacity: 0, transform: "translateY(0)", offset: 0 },
-    { opacity: 0, transform: "translateY(0)", offset: .48 },
-    { opacity: 1, transform: "translateY(0)", offset: .50 },
-    { opacity: 1, transform: "translateY(0)", offset: .86, easing: "ease-in" },
-    { opacity: 0, transform: "translateY(220%)", offset: .98 },
-    { opacity: 0, transform: "translateY(220%)", offset: 1 }
-  ], timing);
-  return [movingMold, material, part];
-}
-
-const progress = document.querySelector(".progress span");
-const floor = document.querySelector("#presses");
-const pressTemplate = document.querySelector("#press-template");
-const speed = document.querySelector("#speed");
-const phases = [...document.querySelectorAll("#phases li")];
-const pause = document.querySelector("#pause");
-const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
-const pressCount = 6;
-const presses = new Map();
-let latestByMachine = new Map();
-let selected;
-let currentPhase = -1;
-let playing = !reducedMotion.matches;
-
-function updateLatestShot() {
-  const press = presses.get(selected);
-  const latest = latestByMachine.get(press?.machineId);
-  document.querySelector("#shot-label").textContent = latest
-    ? `${latest.machineId} / ${latest.moldId} · Shot ${latest.shotCounter}`
-    : "No shot data for this press";
-  document.querySelector("#cycle-time").textContent = format(latest?.cycleTimeS, " s");
-  document.querySelector("#pressure").textContent = format(latest?.injectionPressureBar, " bar");
-  document.querySelector("#cushion").textContent = format(latest?.cushionMm, " mm");
-  document.querySelector("#result").textContent = latest?.result ?? "—";
-}
-
-function selectPress(key) {
-  presses.get(selected)?.button.setAttribute("aria-pressed", "false");
-  selected = key;
-  presses.get(selected).button.setAttribute("aria-pressed", "true");
-  updateLatestShot();
-  updatePhase();
-}
-
-function updateFloor(shots) {
-  latestByMachine = new Map();
-  for (const shot of shots) {
-    if (!latestByMachine.has(shot.machineId)) latestByMachine.set(shot.machineId, shot);
-  }
-
-  const stations = [...latestByMachine.keys()].sort().map(machineId => ({
-    key: `machine:${machineId}`,
-    machineId,
-    label: machineId,
-    type: "Recorded shots"
-  }));
-  while (stations.length < pressCount) {
-    const bay = stations.length + 1;
-    stations.push({ key: `demo:${bay}`, label: `Press ${bay}`, type: "Demo press" });
-  }
-
-  const stationKeys = new Set(stations.map(station => station.key));
-  for (const [key, press] of presses) {
-    if (stationKeys.has(key)) continue;
-    for (const animation of press.animations) animation.cancel();
-    press.button.remove();
-    presses.delete(key);
-  }
-
-  for (const [index, station] of stations.entries()) {
-    if (!presses.has(station.key)) {
-      const fragment = pressTemplate.content.cloneNode(true);
-      const button = fragment.querySelector(".press");
-      const machine = fragment.querySelector(".machine");
-      button.querySelector(".press-render").append(machine);
-      button.querySelector(".press-id").textContent = station.label;
-      button.querySelector(".press-type").textContent = station.type;
-      button.addEventListener("click", () => selectPress(station.key));
-      const animations = animatePress(machine);
-      for (const animation of animations) {
-        animation.currentTime = index * 1350 % cycleDuration;
-        animation.updatePlaybackRate(Number(speed.value));
-        if (!playing) animation.pause();
-      }
-      presses.set(station.key, { ...station, button, animations });
-    }
-
-    const { button } = presses.get(station.key);
-    if (floor.children[index] !== button) floor.insertBefore(button, floor.children[index] ?? null);
-  }
-
-  floor.dataset.layout = stations.length === 6 ? "standard" : "extended";
-  const firstMachine = shots[0]?.machineId;
-  const initialKey = firstMachine == null ? stations[0].key : `machine:${firstMachine}`;
-  if (!presses.has(selected)) selectPress(initialKey);
-  else updateLatestShot();
-}
-
-function updatePhase() {
-  const clamp = presses.get(selected)?.animations[0];
-  const fraction = ((clamp?.currentTime ?? 0) % cycleDuration) / cycleDuration;
+function updatePhase(fraction) {
   progress.style.transform = `scaleX(${fraction})`;
   const index = Math.floor(fraction * phases.length);
   if (index === currentPhase) return;
@@ -204,28 +191,41 @@ function updatePhase() {
   currentPhase = index;
 }
 
-function setPlaying(next) {
-  playing = next;
-  for (const { animations } of presses.values()) {
-    for (const animation of animations) {
-      if (playing) animation.play();
-      else animation.pause();
-    }
-  }
+function setPlaying(value) {
+  playing = value;
+  factory?.setPlaying(playing);
   pause.textContent = playing ? "Pause animation" : "Play animation";
-  updatePhase();
 }
 
-speed.addEventListener("change", () => {
-  for (const { animations } of presses.values()) {
-    for (const animation of animations) animation.updatePlaybackRate(Number(speed.value));
-  }
-});
 pause.addEventListener("click", () => setPlaying(!playing));
+speed.addEventListener("change", () => factory?.setSpeed(Number(speed.value)));
 reducedMotion.addEventListener("change", event => setPlaying(!event.matches));
-updateFloor([]);
+document.querySelector("#reset-view").addEventListener("click", () => factory?.resetView());
+document.querySelector("#zoom-in").addEventListener("click", () => factory?.zoom(.85));
+document.querySelector("#zoom-out").addEventListener("click", () => factory?.zoom(1.15));
+refresh.addEventListener("click", loadShots);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) loadShots();
+});
+setInterval(() => {
+  if (!document.hidden) loadShots();
+}, 5000);
 setPlaying(playing);
-setInterval(updatePhase, 80);
+updateFloor();
 loadShots();
 
-
+try {
+  const { createFactoryScene } = await import("./factory-scene.js");
+  factory = createFactoryScene(selectMachine, updatePhase);
+  factory.setPlaying(playing);
+  factory.setSpeed(Number(speed.value));
+  factory.update(stations, selected);
+} catch (error) {
+  console.error("Unable to initialize factory scene", error);
+  document.querySelector("#scene-error").hidden = false;
+  document.querySelector("#scene-error").textContent =
+    "The 3D view could not start. Enable WebGL in your browser. Select a machine below to view its data.";
+  for (const id of ["reset-view", "zoom-in", "zoom-out", "speed", "pause"]) {
+    document.getElementById(id).disabled = true;
+  }
+}
