@@ -57,18 +57,34 @@ FROM dbo.InjectionShot
 GROUP BY source_file;
 ```
 
-## Run the API locally
+## Configure and run the API locally
 
-Use the database initialized with the loader's [schema.sql](vm-mold-injection-loader/schema.sql). The API's Windows account needs `SELECT` access to `dbo.InjectionShot`.
+Install the .NET 10 SDK and run the loader's [schema.sql](vm-mold-injection-loader/schema.sql) in your target SQL Server database. Import at least one CSV with the loader if you want to see sample results. The API uses the same database and needs `SELECT` permission on `dbo.InjectionShot`.
 
-Set `ConnectionStrings:InjectionShots` in the API's [appsettings.json](vm-mold-injection-api/appsettings.json) to your SQL Server and database. You can override it with the `ConnectionStrings__InjectionShots` environment variable, for example to supply SQL authentication credentials outside source control.
+Update the connection in [vm-mold-injection-api/appsettings.json](vm-mold-injection-api/appsettings.json). This example uses Windows authentication under the account running the API.
 
-```powershell
-dotnet run --project vm-mold-injection-api --urls http://127.0.0.1:5204
+```json
+{
+  "ConnectionStrings": {
+    "InjectionShots": "Server=localhost;Database=vm-mold-injection;Integrated Security=True;Encrypt=True;TrustServerCertificate=False"
+  }
+}
 ```
 
-Open [the injection shots endpoint](http://127.0.0.1:5204/api/injection-shots?limit=10). The API returns the newest rows first with a default limit of 100 and an allowed range of 1 to 1,000.
+Replace the server and database names with yours. To override the file setting, set `ConnectionStrings__InjectionShots` in the shell that starts the API. Use this override to keep SQL authentication credentials out of source control. For local testing with a self-signed SQL Server certificate, you can set `TrustServerCertificate=True` in the override. Use a trusted certificate when deploying.
 
-If your local SQL Server uses an untrusted certificate, you can set `TrustServerCertificate=True` in your local connection string override. This keeps encryption enabled and skips server certificate validation. Use a trusted certificate for deployed environments.
+From the repository root, start the API on a loopback address.
+
+```powershell
+dotnet run --project vm-mold-injection-api --no-launch-profile -- --urls http://127.0.0.1:5204
+```
+
+In another PowerShell window, request the latest 10 shots.
+
+```powershell
+Invoke-RestMethod 'http://127.0.0.1:5204/api/injection-shots?limit=10'
+```
+
+The endpoint returns a JSON array sorted newest first. It defaults to 100 rows, accepts limits from 1 to 1,000, and returns HTTP 400 for invalid limits. An empty database returns an empty array.
 
 Build both projects with `dotnet build vm-mold-injection-loader.slnx`.
