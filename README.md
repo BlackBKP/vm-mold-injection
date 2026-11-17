@@ -88,3 +88,27 @@ Invoke-RestMethod 'http://127.0.0.1:5204/api/injection-shots?limit=10'
 The endpoint returns a JSON array sorted newest first. It defaults to 100 rows, accepts limits from 1 to 1,000, and returns HTTP 400 for invalid limits. An empty database returns an empty array.
 
 Build both projects with `dotnet build vm-mold-injection-loader.slnx`.
+
+## Shop-floor web application
+
+The `vm-mold-injection-web` project serves the single-page shop-floor dashboard and proxies shot requests to the API. It includes selectable molding presses, illustrative molding cycles, playback controls, and light and dark themes. Presses without API records are labeled as demos.
+
+Configure `InjectionApi:Url` in `vm-mold-injection-web/appsettings.json`.
+
+```json
+{
+  "InjectionApi": {
+    "Url": "http://127.0.0.1:5204/api/injection-shots?limit=100"
+  }
+}
+```
+
+Start the API using the command above, then start the web application in another terminal.
+
+```powershell
+dotnet run --project vm-mold-injection-web --no-launch-profile -- --urls http://127.0.0.1:5205
+```
+
+Open http://127.0.0.1:5205. The dashboard refreshes every 30 seconds. Set `InjectionApi__Url` to override the endpoint through an environment variable. API failures show a connection message and retain previously loaded shots.
+
+Build all three projects with `dotnet build vm-mold-injection-loader.slnx`.

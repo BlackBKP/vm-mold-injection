@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Injection Monitor</title>
+  <link rel="stylesheet" href="dashboard.css">
+  <script src="dashboard.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#top"><span aria-hidden="true">◫</span> Injection Monitor</a>
+    <nav aria-label="Dashboard"><a href="#machine-view">Shop floor</a><a href="#history-title">Recent shots</a></nav>
+  </aside>
+  <main id="top">
+    <header>
+      <h1>Injection Monitor</h1>
+      <div class="actions">
+        <button id="theme" type="button">Dark theme</button>
+        <button id="refresh" type="button">Refresh shots</button>
+      </div>
+    </header>
+    <p id="status" role="status">Loading shots…</p>
+    <section class="overview" aria-labelledby="latest-title">
+      <div class="section-heading"><h2 id="latest-title">Latest shot</h2><p class="muted" id="shot-label">—</p></div>
+      <dl>
+        <div><dt>Cycle time</dt><dd id="cycle-time">—</dd></div>
+        <div><dt>Injection pressure</dt><dd id="pressure">—</dd></div>
+        <div><dt>Cushion</dt><dd id="cushion">—</dd></div>
+        <div><dt>Result</dt><dd id="result">—</dd></div>
+      </dl>
+    </section>
+    <section class="viewer" id="machine-view" aria-labelledby="machine-title">
+      <div class="viewer-header">
+        <div><h2 id="machine-title">Shop floor</h2><p class="muted">Simulated cycles · Select a press to view its latest shot</p></div>
+        <div class="actions">
+          <label for="speed">Speed</label>
+          <select id="speed"><option value=".5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+          <button id="pause" type="button">Pause animation</button>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="factory-shell" aria-hidden="true">
+          <div class="factory-wall"></div>
+          <div class="floor"></div>
+        </div>
+        <div id="presses" class="presses" aria-label="Molding presses"></div>
+      </div>
+      <template id="press-template">
+        <button class="press" type="button" aria-pressed="false">
+          <span class="press-render" aria-hidden="true"></span>
+          <span class="press-id"></span>
+          <span class="press-type"></span>
+        </button>
+        <div class="machine">
+          <div class="machine-footprint"></div>
+          <div class="base"><i></i><i></i><i></i><i></i></div>
+          <div class="drive"><i></i></div>
+          <div class="hopper"></div>
+          <div class="barrel"><div class="flow"></div></div>
+          <div class="housing">
+            <span class="model">SE100EV-S</span>
+            <div class="window rear-window"></div>
+            <div class="window cycle-window">
+              <div class="rail"></div>
+              <div class="mold moving"></div>
+              <div class="mold fixed"></div>
+              <div class="part"></div>
+            </div>
+          </div>
+          <div class="controller"><i></i></div>
+          <div class="signal"></div>
+        </div>
+      </template>
+      <div class="cycle"><ol id="phases"><li>Clamp</li><li>Inject</li><li>Cool</li><li>Eject</li></ol><span class="progress" aria-hidden="true"><span></span></span></div>
+    </section>
+    <section class="history" aria-labelledby="history-title">
+      <h2 id="history-title">Recent shots</h2>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Recent shots table">
+        <table>
+          <thead><tr>
+            <th scope="col">Shot time</th><th scope="col">Machine</th><th scope="col">Mold</th>
+            <th scope="col">Shot</th><th scope="col">Cycle (s)</th><th scope="col">Cushion (mm)</th>
+            <th scope="col">Pressure (bar)</th><th scope="col">Result</th>
+          </tr></thead>
+          <tbody id="shots"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
+
+
+
