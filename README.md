@@ -2,7 +2,19 @@
 
 A .NET 10 console app that imports mold injection shot exports into one SQL Server table, `dbo.InjectionShot`.
 
-## Setup
+## Download and run on Windows
+
+1. Download `vm-mold-injection-loader-v1.0.0-win-x64.zip` from the [GitHub release](https://github.com/BlackBKP/vm-mold-injection/releases/tag/v1.0.0) and extract the whole ZIP. The package targets 64-bit Windows and includes the .NET runtime.
+2. Run the included `schema.sql` in your target SQL Server database.
+3. Edit the included `appsettings.json` with your CSV folder and SQL Server connection. See the sample settings below.
+4. Open PowerShell in the extracted folder and validate, then import.
+
+```powershell
+.\vm-mold-injection-loader.exe --dry-run
+.\vm-mold-injection-loader.exe
+```
+
+## Run from source
 
 1. Install the .NET 10 SDK and have access to a SQL Server database. Clone this repository.
 2. Create a database, select it in SQL Server Management Studio, and execute [schema.sql](vm-mold-injection-loader/schema.sql). The account that runs the loader needs permission to insert and delete rows in the table and to read the columns used by its delete filter.
