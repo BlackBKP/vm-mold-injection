@@ -1,6 +1,6 @@
-# VM Mold Injection Loader
+# VM Mold Injection
 
-A .NET 10 console app that imports mold injection shot exports into one SQL Server table, `dbo.InjectionShot`.
+The .NET 10 console loader imports mold injection shot exports into SQL Server. The ASP.NET Core API reads the same `dbo.InjectionShot` table. Both projects are included in `vm-mold-injection-loader.slnx`.
 
 ## Download and run on Windows
 
@@ -56,3 +56,19 @@ SELECT source_file, COUNT(*) AS shot_count
 FROM dbo.InjectionShot
 GROUP BY source_file;
 ```
+
+## Run the API locally
+
+Use the database initialized with the loader's [schema.sql](vm-mold-injection-loader/schema.sql). The API's Windows account needs `SELECT` access to `dbo.InjectionShot`.
+
+Set `ConnectionStrings:InjectionShots` in the API's [appsettings.json](vm-mold-injection-api/appsettings.json) to your SQL Server and database. You can override it with the `ConnectionStrings__InjectionShots` environment variable, for example to supply SQL authentication credentials outside source control.
+
+```powershell
+dotnet run --project vm-mold-injection-api --urls http://127.0.0.1:5204
+```
+
+Open [the injection shots endpoint](http://127.0.0.1:5204/api/injection-shots?limit=10). The API returns the newest rows first with a default limit of 100 and an allowed range of 1 to 1,000.
+
+If your local SQL Server uses an untrusted certificate, you can set `TrustServerCertificate=True` in your local connection string override. This keeps encryption enabled and skips server certificate validation. Use a trusted certificate for deployed environments.
+
+Build both projects with `dotnet build vm-mold-injection-loader.slnx`.

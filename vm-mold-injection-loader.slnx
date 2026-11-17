@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="vm-mold-injection-api/vm-mold-injection-api.csproj" />
   <Project Path="vm-mold-injection-loader/vm-mold-injection-loader.csproj" />
 </Solution>
