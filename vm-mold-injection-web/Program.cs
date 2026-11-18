@@ -8,8 +8,7 @@ namespace vm_mold_injection_web
         {
             var builder = WebApplication.CreateBuilder(args);
             builder.Services.AddProblemDetails();
-            builder.Services.AddHttpClient("InjectionApi", client =>
-                client.Timeout = TimeSpan.FromSeconds(10));
+            builder.Services.AddHttpClient("InjectionApi", client => client.Timeout = TimeSpan.FromSeconds(10));
 
             var app = builder.Build();
             app.UseExceptionHandler();
@@ -22,17 +21,15 @@ namespace vm_mold_injection_web
         }
 
         private static async Task<IResult> GetShotsAsync(
-            IConfiguration configuration,
-            IHttpClientFactory clients,
-            ILoggerFactory loggerFactory,
+            IConfiguration configuration, 
+            IHttpClientFactory clients, 
+            ILoggerFactory loggerFactory, 
             CancellationToken cancellationToken)
         {
             string? endpoint = configuration["InjectionApi:Url"];
-            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out Uri? url) ||
-                (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps))
+            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out Uri? url) || (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps))
             {
-                return Results.Problem(
-                    "Configure InjectionApi:Url with an absolute HTTP or HTTPS endpoint.");
+                return Results.Problem("Configure InjectionApi:Url with an absolute HTTP or HTTPS endpoint.");
             }
 
             try
@@ -42,12 +39,10 @@ namespace vm_mold_injection_web
                 response.EnsureSuccessStatusCode();
 
                 await using Stream body = await response.Content.ReadAsStreamAsync(cancellationToken);
-                using JsonDocument json = await JsonDocument.ParseAsync(
-                    body, cancellationToken: cancellationToken);
+                using JsonDocument json = await JsonDocument.ParseAsync(body, cancellationToken: cancellationToken);
                 if (json.RootElement.ValueKind != JsonValueKind.Array)
                 {
-                    return Results.Problem(
-                        "The injection shot API returned an unexpected response.", statusCode: 502);
+                    return Results.Problem("The injection shot API returned an unexpected response.", statusCode: 502);
                 }
 
                 return Results.Json(json.RootElement.Clone());
@@ -57,10 +52,8 @@ namespace vm_mold_injection_web
                 error is OperationCanceledException && !cancellationToken.IsCancellationRequested)
             {
                 ILogger logger = loggerFactory.CreateLogger(typeof(Program).FullName!);
-                logger.LogWarning(
-                    "Injection shot API request failed ({ErrorType}).", error.GetType().Name);
-                return Results.Problem(
-                    "Unable to load shots from the configured API.", statusCode: 502);
+                logger.LogWarning("Injection shot API request failed ({ErrorType}).", error.GetType().Name);
+                return Results.Problem("Unable to load shots from the configured API.", statusCode: 502);
             }
         }
     }
