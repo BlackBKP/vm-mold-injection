@@ -21,6 +21,7 @@
         <button id="refresh" type="button">Refresh shots</button>
       </div>
     </header>
+    <p id="data-mode" class="demo-banner" hidden>Showcase · Simulated data for six machines</p>
     <p id="status" role="status">Loading shots…</p>
     <section class="viewer" id="machine-view" aria-labelledby="machine-title">
       <div class="viewer-header">
@@ -56,7 +57,7 @@
           <dl class="shot-details">
             <div><dt>Mold</dt><dd id="mold-id">—</dd></div>
             <div><dt>Shot counter</dt><dd id="shot-counter">—</dd></div>
-            <div><dt>Last shot time (machine)</dt><dd id="shot-time">—</dd></div>
+            <div><dt id="shot-time-label">Last shot time (machine)</dt><dd id="shot-time">—</dd></div>
             <div><dt>Data fetched</dt><dd id="fetched-time">—</dd></div>
             <div><dt>Source file</dt><dd id="source-file">—</dd></div>
           </dl>

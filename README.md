@@ -11,6 +11,7 @@ Machine CSV exports → Loader → SQL Server → API → Web dashboard
 ## Find what you need
 
 - [Set up the complete system](#set-up-the-complete-system)
+- [Deploy a Vercel showcase](#deploy-a-vercel-showcase)
 - [Use the dashboard](#use-the-dashboard)
 - [Import new machine exports](#import-new-machine-exports)
 - [CSV file format](#csv-file-format)
@@ -131,6 +132,72 @@ Open [the factory dashboard](http://127.0.0.1:5205/). Keep both the API and dash
 
 The startup commands use explicit ports and ignore Visual Studio launch profiles so that the API and dashboard addresses match this guide.
 
+## Deploy a Vercel showcase
+
+The showcase runs the 3D factory floor with **six simulated machines**. Each machine has its own mold, cycle time, pressure, cushion, shot counter, and OK/NG results. Readings advance as simulated shots complete, and the dashboard refreshes every five seconds.
+
+A visible **Showcase · Simulated data** banner identifies the demo. Machine labels show **Demo OK** or **Demo NG**, and the detail panel identifies its simulated readings. All readings are generated in the visitor's browser. The showcase runs as a static website without an API or database.
+
+### Deploy from GitHub
+
+1. Sign in to Vercel and choose **Add New → Project**.
+2. Import the GitHub repository **BlackBKP/vm-mold-injection**.
+3. Keep **Root Directory** at the repository root.
+4. Use **Other** as the framework preset. The repository's [vercel.json](vercel.json) supplies the build command and output directory.
+5. Check these build settings, then select **Deploy**.
+
+| Setting | Value |
+| --- | --- |
+| Production branch | `main` |
+| Framework preset | `Other` |
+| Root directory | Repository root |
+| Build command | `node scripts/build-showcase.mjs` |
+| Output directory | `dist` |
+| Install command | Empty |
+| Environment variables | None required for the demo |
+
+After deployment, open the URL Vercel provides. Confirm that the showcase banner appears and all six machine buttons have simulated results. Select a machine to inspect its readings, then try orbit, zoom, theme switching, and playback controls.
+
+GitHub pushes to the configured production branch trigger new deployments when Vercel's Git integration is enabled. See [Vercel's build configuration guide](https://vercel.com/docs/builds/configure-a-build) for the project settings.
+
+### Preview the static showcase locally
+
+Install Node.js 22 or later and build the showcase from the repository root.
+
+```powershell
+node scripts/build-showcase.mjs
+```
+
+The command creates a fresh `dist` folder containing the website and its demo configuration. To preview it using Python 3, run the following command and open [the local showcase](http://127.0.0.1:5300/).
+
+```powershell
+python -m http.server 5300 --directory dist --bind 127.0.0.1
+```
+
+Keep that terminal open while previewing. Press **Ctrl+C** to stop it. You can also serve `dist` with another static HTTP server.
+
+### Choose demo or API data
+
+The browser reads [dashboard-config.json](vm-mold-injection-web/wwwroot/dashboard-config.json) to choose its data source.
+
+| Where you run it | Data source |
+| --- | --- |
+| .NET web app using the checked-in settings | API records from `/data/shots`, with the upstream URL configured in `appsettings.json` |
+| Generated `dist` website, including Vercel | Simulated records generated in the browser |
+
+The showcase build copies the web assets and writes `{"mode":"demo"}` into `dist/dashboard-config.json`. Its source configuration stays in API mode. Rebuild the showcase after changing web assets.
+
+For a local .NET demo, set `mode` to `demo` in the source browser configuration and reload the page. Set it back to `api` to resume API records.
+
+```json
+{
+  "mode": "api",
+  "shotsUrl": "/data/shots"
+}
+```
+
+A static deployment can read live records from an HTTPS API by using API mode and that API's public URL as `shotsUrl`. The API must allow the website's origin through CORS. The generated showcase is configured for demo data on every build. Running the .NET API requires separate hosting.
+
 ## Use the dashboard
 
 ### Explore the factory
@@ -165,6 +232,7 @@ The dashboard refreshes every **5 seconds** while the page is visible. It also r
 | --- | --- |
 | **Latest OK** | The latest available shot has an `OK` result |
 | **Latest NG**, or another result | The label repeats the latest available shot result |
+| **Demo OK** or **Demo NG** | A simulated shot result in showcase mode |
 | **Result unavailable** | The returned shot has no result value |
 | **Connection lost** | The latest refresh failed. Previously fetched data remains visible |
 | **No recent shots** | This machine was seen earlier in the session but is absent from the latest response |
@@ -273,7 +341,7 @@ ORDER BY source_file;
 | --- | --- | --- |
 | Loader | `vm-mold-injection-loader/appsettings.json` → `CsvFolder`, `ConnectionString` | `MOLD_LOADER_CONNECTION_STRING` overrides the connection. A folder argument overrides `CsvFolder` |
 | API | `vm-mold-injection-api/appsettings.json` → `ConnectionStrings:InjectionShots` | `ConnectionStrings__InjectionShots` |
-| Dashboard | `vm-mold-injection-web/appsettings.json` → `InjectionApi:Url` | `InjectionApi__Url` |
+| Dashboard API proxy | `vm-mold-injection-web/appsettings.json` → `InjectionApi:Url` | `InjectionApi__Url` |
 
 Keep SQL authentication credentials in environment variables instead of committing them to the repository.
 

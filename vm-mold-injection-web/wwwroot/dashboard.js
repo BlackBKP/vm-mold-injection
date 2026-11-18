@@ -1,3 +1,5 @@
+import { createShotSource } from "./shot-source.js";
+
 const themeButton = document.querySelector("#theme");
 const systemTheme = matchMedia("(prefers-color-scheme: dark)");
 let savedTheme;
@@ -44,6 +46,7 @@ const phases = [...document.querySelectorAll("#phases li")];
 const progress = document.querySelector(".progress span");
 const machines = new Map();
 const stationButtons = new Map();
+let shotSource;
 let selected;
 let factory;
 let stations = [];
@@ -63,7 +66,7 @@ function machineStatus(machine) {
   if (!machine.inWindow) return { text: "No recent shots", kind: "unknown" };
   const result = machine.shot.result;
   return {
-    text: result ? `Latest ${result}` : "Result unavailable",
+    text: result ? `${shotSource?.mode === "demo" ? "Demo" : "Latest"} ${result}` : "Result unavailable",
     kind: result?.toUpperCase() === "OK" ? "ok" : "attention"
   };
 }
@@ -77,7 +80,7 @@ function updateDetails() {
   state.textContent = station ? station.status.text : "—";
   state.dataset.state = station?.status.kind ?? "";
   document.querySelector("#shot-label").textContent = station
-    ? latest ? "Latest available shot from this machine." : "Demo press · No connected machine data."
+    ? latest ? (shotSource?.mode === "demo" ? "Simulated shot from this showcase machine." : "Latest available shot from this machine.") : "Demo press · No connected machine data."
     : "Click a machine or its label to inspect its latest shot.";
   const fields = {
     "cycle-time": format(latest?.cycleTimeS, " s"),
@@ -138,9 +141,13 @@ async function loadShots() {
   if (refresh.disabled) return;
   refresh.disabled = true;
   try {
-    const response = await fetch("/data/shots", { cache: "no-store" });
-    if (!response.ok) throw new Error("Shot request failed");
-    const shots = await response.json();
+    shotSource ??= await createShotSource();
+    const isDemo = shotSource.mode === "demo";
+    document.querySelector("#data-mode").hidden = !isDemo;
+    document.querySelector("#history-title").textContent = isDemo ? "Recent simulated shots" : "Recent shots";
+    document.querySelector("#shot-time-label").textContent = isDemo ? "Simulated shot time (UTC)" : "Last shot time (machine)";
+    refresh.textContent = isDemo ? "Refresh demo" : "Refresh shots";
+    const shots = await shotSource.readShots();
     if (!Array.isArray(shots) || shots.some(shot => !shot || typeof shot.machineId !== "string")) {
       throw new Error("Unexpected shot response");
     }
@@ -168,7 +175,7 @@ async function loadShots() {
     feedFailed = false;
     status.removeAttribute("data-error");
     status.textContent = shots.length
-      ? `${shots.length} shots · ${seen.size} machines in latest response · Updated ${fetchedAt.toLocaleTimeString()}`
+      ? `${shots.length} ${isDemo ? "simulated " : ""}shots · ${seen.size} ${seen.size === 1 ? "machine" : "machines"} · Updated ${fetchedAt.toLocaleTimeString()}`
       : "The API returned no recent shots.";
   } catch {
     feedFailed = true;
